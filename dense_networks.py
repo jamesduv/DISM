@@ -4,18 +4,27 @@
 import os
 import tensorflow as tf
 import numpy as np
-import os
-import losses
 
+'''Dense neural networks'''
 
 def swish(x):
     return (x*tf.keras.activations.sigmoid(x))
 
 tf.keras.utils.get_custom_objects().update({'swish': swish})   
-tf.keras.utils.get_custom_objects().update({'swish_fn': swish})
 
 class dense_base():
+    '''Base-level functionality for dense networks. 
+    Provided methods:
+        - set_kernel_regularizer
+        - set_activation
+        - set_optimizer
+        - set_loss'''
+
     def __init__(self, opt, data=None):
+        '''Initialize class instance
+        Args:
+            opt (dict)  : all network settings
+            data (dict) : data used in training, not required'''
         self.opt    = opt
         self.data   = data
 
@@ -74,33 +83,43 @@ class dense_base():
                   'MSLE':tf.keras.losses.MSLE,
                   'binary_crossentropy':tf.keras.losses.binary_crossentropy,
                   'categorical_crossentropy':tf.keras.losses.categorical_crossentropy,
-                  'categorical_hinge':tf.keras.losses.categorical_hinge,
-                  'mse_gs':None}
+                  'categorical_hinge':tf.keras.losses.categorical_hinge}
 
         if self.opt['loss'] not in all_losses.keys():
             raise Exception('Unsupported loss function specified: {}'.format(self.opt['loss']))
-        if self.opt['loss'] == 'mse_gs':
-            self.loss = losses.mse_grad_sharp(lambda_gs = self.opt['lambda_gs'])
         else:
             self.loss = all_losses[self.opt['loss']]
 
 class dense_v1(dense_base):
+    '''Dense network v1 implementation
+    
+    Attributes:
+        self.model: tf.keras.Model, dense network 
+    
+    Methods:
+        self.build_model
+        self.train_model_keras
+        self.train_model_keras_noval
+        self.set_save_paths
+        self.make_callbacks_weights
+        self.set_training_options
+        self.start_csv_logger
+        self.tensorboard_callbacks
+    '''
+
     def __init__(self, opt, data=None):
         dense_base.__init__(self, opt, data)
-
-        #set items required to build model
-        # self.set_kernel_regularizer()
         self.set_activation()
         self.call_backs = None
 
-
     def build_model(self):
+        '''Construct the dense network using self.opt'''
+
         self.layer_names = []
 
         #input layer
         input1 = tf.keras.Input(shape=(self.opt['input_dim']), name='input')
         output = None
-
 
         # Dense Layers Construction
         print('Constructing Dense Layers')
@@ -108,8 +127,8 @@ class dense_v1(dense_base):
             layername = 'dense_{:1.0f}'.format(iDense)
             print(layername)
             self.layer_names.append(layername)
-            units = self.opt['n_nodes'][iDense]
-            activation = self.activation
+            units       = self.opt['n_nodes'][iDense]
+            activation  = self.activation
 
             if iDense == 0:
                 output = tf.keras.layers.Dense(units   = units,
@@ -131,6 +150,8 @@ class dense_v1(dense_base):
         self.model.summary()
 
     def train_model_keras(self):
+        '''Compile and train the model using self.data, with validation group'''
+
         self.model.compile(optimizer = self.optimizer, loss=self.loss)
         self.history = self.model.fit(x         = self.data['x_train'],
                                       y         = self.data['y_train'],
@@ -140,6 +161,8 @@ class dense_v1(dense_base):
                                       validation_data = (self.data['x_val'], self.data['y_val']))
 
     def train_model_keras_noval(self):
+        '''Compile and train the model using self.data, without validation group'''
+
         self.model.compile(optimizer = self.optimizer, loss=self.loss)
         self.history = self.model.fit(x         = self.data['x_train'],
                                       y         = self.data['y_train'],
@@ -148,6 +171,8 @@ class dense_v1(dense_base):
                                       batch_size = self.opt['batch_size'])
 
     def set_save_paths(self):
+        '''Set the paths for weight/model checkpoints'''
+
         self.fn_csv             = os.path.join(self.opt['save_dir'], 'training.csv')
 
         self.fn_weights_val_best    = os.path.join(self.opt['save_dir'], 'weights.val_best.h5')
@@ -159,7 +184,12 @@ class dense_v1(dense_base):
         self.fn_model_end           = os.path.join(self.opt['save_dir'], 'model.end.tf')
 
     def make_callbacks_weights(self):
-        '''Make checkpoints to save the weights only during training'''
+        '''Make checkpoints to save the weights during training. 
+        Make checkpoints for:
+            1. best validation loss
+            2. best training loss
+            3. most recent epoch'''
+
         if self.call_backs is None:
             self.call_backs = []
 
@@ -186,6 +216,8 @@ class dense_v1(dense_base):
         self.call_backs.append(checkpoint_3)
 
     def set_training_options(self):
+        '''Set necessary training options'''
+
         self.set_optimizer()
         self.set_loss()
         self.set_save_paths()
@@ -198,6 +230,7 @@ class dense_v1(dense_base):
         self.call_backs.append(csv_logger)
     
     def tensorboard_callbacks(self, histogram_freq=10, profile_batch=(1,5)):
+        '''Make Tensorboard callbacks to profile the model'''
 
         self.log_dir = os.path.join(self.opt['save_dir'], 'tb_logs', 'training')
         tb_callback  = tf.keras.callbacks.TensorBoard(log_dir = self.log_dir,
