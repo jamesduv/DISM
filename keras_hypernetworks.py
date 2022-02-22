@@ -20,9 +20,9 @@ def keras_hypernet_v1_dims(nlayers     = 3,
     the sizes and shapes of each weight matrix/vector'''
     
     #total number of weights in the model to predict
-    wt_input_dim  = nh*nspatial + nh     #first hidden layer # weights
-    wt_hidden_dim = nh**2 + nh          #other hidden layer # weights
-    wt_output_dim = nh*nstate + nstate  #output layer # weights
+    wt_input_dim  = nh*nspatial + nh        #first hidden layer # weights
+    wt_hidden_dim = nh**2 + nh              #other hidden layer # weights
+    wt_output_dim = nh*nstate + nstate      #output layer # weights
     wt_total_dim  =  ((nh*nspatial) + nh) + ((nlayers-1)*nh*(nh+1)) + (nstate*(nh+1))
 
     #store shapes of each weight matrix and bias vector
@@ -51,6 +51,7 @@ def keras_hypernet_v1_dims(nlayers     = 3,
     return retval
 
 ## TODO: update call_model, assign activations ahead of time, allow for activation other than swish
+## TODO: Efficient forward pass
 class keras_hypernet_v1(tf.keras.Model):
     '''Simple implementation of keras hypernetwork, without using
     tf.keras layers/models for the main network and subclassing tf.keras.Model
