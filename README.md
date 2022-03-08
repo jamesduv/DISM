@@ -27,6 +27,7 @@ The repo should contain the following files:
     ├── dense_networks.py        
     ├── keras_hypernetworks.py      
     ├── nids_keras_networks.py   
+    ├── tf_common.py 
     └── README.md
 -----------------------------------
 
@@ -40,6 +41,7 @@ File | Description
 dense_networks.py | class definition for dense neural network, constructed using Keras sequential API. Used as standalone model for DV-MLP, used as subcomponents for DV-Hnet and NIDS.
 keras_hypernetworks.py | class definition for DV-Hnet, subclasses ```tf.keras.Model.```
 nids_keras_networks.py | class definition for NIDS, subclasses ```tf.keras.Model.```
+tf_common.py | common tensorflow functions
 
 **Data files**
 
