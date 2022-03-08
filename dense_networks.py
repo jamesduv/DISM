@@ -133,7 +133,9 @@ class dense_v1(dense_base):
             if iDense == 0:
                 output = tf.keras.layers.Dense(units   = units,
                                             activation = activation,
-                                            name       = layername)(input1)
+                                            name       = layername,
+                                            kernel_initializer  = 'glorot_uniform',
+                                            bias_initializer    = 'zeros')(input1)
             else:
                 if iDense == (self.opt['n_layers']-1):
                     units = self.opt['n_output']
@@ -144,7 +146,9 @@ class dense_v1(dense_base):
                     
                 output = tf.keras.layers.Dense(units         = units,
                                                 activation   = activation,
-                                                name         = layername)(output)
+                                                name         = layername,
+                                                kernel_initializer  = 'glorot_uniform',
+                                                bias_initializer    = 'zeros')(output)
 
         self.model = tf.keras.Model(inputs=[input1], outputs=output)
         self.model.summary()
@@ -268,7 +272,7 @@ def get_dense_opt(network_func  = 'dense_v1',
                   optimizer     = 'Adam',
                   n_epochs_save     = 25,
                   learning_rate     = 1e-04,
-                  is_learning_rate_decay = True,
+                  is_learning_rate_decay = False,
                   kernel_regularizer = None,
                   is_load_weights   = False,
                   fn_weights_load   = None,   #weights to use IF continuing
