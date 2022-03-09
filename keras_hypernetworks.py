@@ -19,7 +19,7 @@ def keras_hypernet_v1_dims(n_layers_hidden  = 3,
     the size and shape of each element
 
     Args:
-        n_layers_hidden (int)   : number of model hidden layers
+        n_layers_hidden (int)   : number of main network hidden layers
         n_nodes_hidden (int)    : number of nodes per hidden layer
         n_spatial (int)         : number of spatial or main network inputs
         n_state (int)           : number of states or main network outputs 
@@ -29,9 +29,9 @@ def keras_hypernet_v1_dims(n_layers_hidden  = 3,
     '''
 
     #total number of weights and biases in the model to generate
-    wt_input_dim  = n_nodes_hidden*n_spatial + n_nodes_hidden     #first hidden layer # weights
-    wt_hidden_dim = n_nodes_hidden**2 + n_nodes_hidden            #other hidden layer # weights
-    wt_output_dim = n_nodes_hidden*n_state + n_state      #output layer # weights
+    wt_input_dim  = n_nodes_hidden*n_spatial + n_nodes_hidden
+    wt_hidden_dim = n_nodes_hidden**2 + n_nodes_hidden   
+    wt_output_dim = n_nodes_hidden*n_state + n_state      
 
     wt_total_dim = wt_input_dim + ((n_layers_hidden - 1) * (wt_hidden_dim)) + wt_output_dim
 
@@ -61,23 +61,43 @@ def keras_hypernet_v1_dims(n_layers_hidden  = 3,
     return weight_info
 
 class keras_hypernet_v1(tf.keras.Model):
-    '''Keras hypernetwork implementation. Takes a tf.keras.Model hypernetwork as an argument during construction,
-    and subclasses tf.keras.Model.
+    '''Design-variable hypernetwork model. Subclasses tf.keras.Model, and takes 
+    an arbitrary tf.keras.Model hypernetwork as an argument during construction.
 
-    Set up for full-mixed batches during training, where the hypernetwork is evaluated for each 
-    spatial input, see self.call and self.call_model. 
+    Two methods are provided to call the overall model, where the hypernetwork
+    is either evaluated once (efficient), or as many times as there are main 
+    network inputs (inefficient).
+    1. call_model() : inefficient
+    2. 
     
     Attributes:
-        self.hypernet (tf.keras model)  : tf.keras hypernetwork, outputs tensor wts = ncases x nwt
-        self.opt (dict)                 : all model options
-            self.opt['split_sizes'] (list of int)  : weight/bias dimensions, used to split generated weight tensor
-            self.opt['wt_shapes'] (list of tuple)  : shape of weight element as tuples, with leading -1, as in (-1, dim1, dim2) to account for batch axis, as needed during training
-
+        self.hypernet (tf.keras.Model)  : tf.keras hypernetwork, generates weights/biases
+        self.opt (dict)         : all model options, includes entries from keras_hypernet_v1_dims()
+        self.call_backs (list)  : container for training callbacks
+        self.activation (tf.keras.activation)       : main network activation 
+        self.f_activ (list of tf.keras.activation)  : list of main network activations, layerwise
+        Filenames:
+            self.fn_csv                 
+            self.fn_weights_val_best    
+            self.fn_weights_train_best  
+            self.fn_weights_end         
+            self.fn_model_val_best      
+            self.fn_model_train_best    
+            self.fn_model_end           
+            
     Methods:
-        call
-        call_model
-        compose_main
-        '''
+        call()          : wrapper around self.call_model()  
+        call_model()    : forward propagate, without composing main network
+        compose_main_network()  : make main network w/generated weights
+        build_main_network_model() : make main network w/random weights
+        set_save_paths()    : training utility, make filenames
+        start_csv_logger()  : training utility
+        make_callbacks_weights() : training utility, callbacks to save weights
+        make_callbacks_model()   : training utility, callbacks to save model
+        tensorboard_callbacks()  : training utility, profiling callback
+        build_main_net_activations() : make list of activations, for use with call, call_model
+
+    '''
         
     def __init__(self, opt, hypernet):
         super(keras_hypernet_v1, self).__init__()
@@ -106,7 +126,7 @@ class keras_hypernet_v1(tf.keras.Model):
             output[-1]  (ndarray/tensor) : main network output
         '''
 
-        #generate weights with hypernetwor
+        #generate weights with hypernetwork
         weights = self.hypernet(mu, training=training)
 
         #split output, reshape into weight/bias matrices/vectors
@@ -127,7 +147,7 @@ class keras_hypernet_v1(tf.keras.Model):
             Wcur        = wt_shp[idx_start]
             bcur        = wt_shp[idx_start + 1]
 
-            #layer multiplication
+            #layer multiplication, activation
             zh = tf.einsum('ijk,ik->ij', Wcur, output[iLayer]) + bcur
             hcur = self.f_activ[iLayer](zh)
             output.append(hcur)
@@ -135,10 +155,14 @@ class keras_hypernet_v1(tf.keras.Model):
         # return weights, split_weights, wt_shp, zh_all, output
         return output[-1]
 
-    def compose_main_network(self, mu):
+    def compose_main_network(self, mu, is_print_model_summary = False):
         '''Given a parameter vector mu, call the hypernetwork to generate
         main network weights, and compose the main network using the weights
-        in a tf.keras.Model '''
+        in a tf.keras.Model 
+        
+        Returns:
+            model (tf.keras.Model) : main network model, with weights loaded
+         '''
 
         weights         = self.hypernet(mu)
         n_layers_total  = self.opt['n_layers_hidden'] + 1 #hidden + output layer
@@ -166,6 +190,8 @@ class keras_hypernet_v1(tf.keras.Model):
 
         #get tf.keras.Model
         model = self.build_main_network_model()
+        if is_print_model_summary:
+            model.summary()
 
         #load the weights into the model
         for iLayer, curwts in enumerate(wts_all):
@@ -176,10 +202,10 @@ class keras_hypernet_v1(tf.keras.Model):
 
     def build_main_network_model(self,):
         '''Build and return main network model as specified in self.opt with 
-        freshly initialized weights, use Keras functional API
+        newly initialized weights, use Keras functional API
         
         Returns:
-            model (tf.keras.Model) : main network model
+            model (tf.keras.Model) : main network model, randomly initialized weights
         '''
 
         n_layers_total  = self.opt['n_layers_hidden'] + 1
