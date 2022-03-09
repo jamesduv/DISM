@@ -96,7 +96,6 @@ class keras_hypernet_v1(tf.keras.Model):
         make_callbacks_model()   : training utility, callbacks to save model
         tensorboard_callbacks()  : training utility, profiling callback
         build_main_net_activations() : make list of activations, for use with call, call_model
-
     '''
         
     def __init__(self, opt, hypernet):
@@ -137,7 +136,7 @@ class keras_hypernet_v1(tf.keras.Model):
             curwt = tf.reshape(split_weights[iShape], target_shape)
             wt_shp.append(curwt)
 
-        #forward propagate
+        #forward propagate, without composing main model
         output  = []
         output.append(x)
         for iLayer in np.arange(self.opt['n_layers_hidden']+1):
@@ -262,7 +261,13 @@ class keras_hypernet_v1(tf.keras.Model):
         self.call_backs.append(csv_logger)
           
     def make_callbacks_weights(self):
-        '''Make checkpoints to save the model weights in .h5 format during training'''
+        '''Make checkpoints to save the model weights in .h5 format during training
+        
+        Make checkpoints for:
+            1. best validation loss
+            2. best training loss
+            3. most recent epoch
+        '''
 
         if self.call_backs is None:
             self.call_backs = []
@@ -290,7 +295,13 @@ class keras_hypernet_v1(tf.keras.Model):
         self.call_backs.append(checkpoint_3)
 
     def make_callbacks_model(self):
-        '''Make callbacks to save the model in .tf format during training'''
+        '''Make callbacks to save the model in .tf format during training.
+        
+        Make checkpoints for:
+            1. best validation loss
+            2. best training loss
+            3. most recent epoch
+        '''
 
         if self.call_backs is None:
             self.call_backs = []
@@ -321,7 +332,8 @@ class keras_hypernet_v1(tf.keras.Model):
         self.call_backs.append(checkpoint_3)
 
     def tensorboard_callbacks(self, histogram_freq=10, profile_batch=(1,5)):
-        '''Create tensorboard callbacks
+        '''Make Tensorboard callbacks to profile the model during training
+
         Args:
             histogram_freq (int) : epoch-frequency to save histograms, use 0 to not save histograms
             profile_batch (int or tuple of int) : batch or batches to profile between

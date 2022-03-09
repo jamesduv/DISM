@@ -3,9 +3,6 @@
 
 import os
 import tensorflow as tf
-import numpy as np
-
-'''Dense neural networks'''
 
 def swish(x):
     return (x*tf.keras.activations.sigmoid(x))
@@ -14,17 +11,20 @@ tf.keras.utils.get_custom_objects().update({'swish': swish})
 
 class dense_base():
     '''Base-level functionality for dense networks. 
-    Provided methods:
-        - set_kernel_regularizer
-        - set_activation
-        - set_optimizer
-        - set_loss'''
+
+    Attributes:
+        opt (dict)  : all model options
+        data (dict) : training data, not required 
+
+
+    Methods:
+        set_kernel_regularizer()
+        set_activation()
+        set_optimizer()
+        set_loss()
+    '''
 
     def __init__(self, opt, data=None):
-        '''Initialize class instance
-        Args:
-            opt (dict)  : all network settings
-            data (dict) : data used in training, not required'''
         self.opt    = opt
         self.data   = data
 
@@ -91,20 +91,22 @@ class dense_base():
             self.loss = all_losses[self.opt['loss']]
 
 class dense_v1(dense_base):
-    '''Dense network v1 implementation
+    '''Dense network v1 implementation. Does not subclass tf.keras.Model, but
+    creates and uses sequential dense tf.keras.Model.
     
     Attributes:
-        self.model: tf.keras.Model, dense network 
+        model (tf.keras.Model)  : dense network 
+        call_backs (list)       : container for training callbacks
     
     Methods:
-        self.build_model
-        self.train_model_keras
-        self.train_model_keras_noval
-        self.set_save_paths
-        self.make_callbacks_weights
-        self.set_training_options
-        self.start_csv_logger
-        self.tensorboard_callbacks
+        build_model() : build self.model, using self.opt
+        train_model_keras() : train model using model.fit(), w/validation data
+        train_model_keras_noval() : train model using model.fit(), no validation data
+        set_save_paths() : training utility, make filenames
+        make_callbacks_weights() : training utility, callbacks to save weights
+        set_training_options()  : set all training options
+        start_csv_logger()      : training utility
+        tensorboard_callbacks() : training utility, profiling callback
     '''
 
     def __init__(self, opt, data=None):
@@ -113,7 +115,7 @@ class dense_v1(dense_base):
         self.call_backs = None
 
     def build_model(self):
-        '''Construct the dense network using self.opt'''
+        '''Construct self.model using self.opt'''
 
         self.layer_names = []
 
@@ -175,7 +177,7 @@ class dense_v1(dense_base):
                                       batch_size = self.opt['batch_size'])
 
     def set_save_paths(self):
-        '''Set the paths for weight/model checkpoints'''
+        '''Set paths for saving items during training'''
 
         self.fn_csv             = os.path.join(self.opt['save_dir'], 'training.csv')
 
@@ -228,13 +230,20 @@ class dense_v1(dense_base):
         self.make_callbacks_weights()
         
     def start_csv_logger(self):
+        '''Start the csv_logger for training'''
+
         csv_logger = tf.keras.callbacks.CSVLogger(self.fn_csv)
         if self.call_backs is None:
             self.call_backs = []
         self.call_backs.append(csv_logger)
     
     def tensorboard_callbacks(self, histogram_freq=10, profile_batch=(1,5)):
-        '''Make Tensorboard callbacks to profile the model'''
+        '''Make Tensorboard callbacks to profile the model during training
+        
+        Args:
+            histogram_freq (int) : epoch-frequency to save histograms, use 0 to not save histograms
+            profile_batch (int or tuple of int) : batch or batches to profile between
+        '''
 
         self.log_dir = os.path.join(self.opt['save_dir'], 'tb_logs', 'training')
         tb_callback  = tf.keras.callbacks.TensorBoard(log_dir = self.log_dir,
@@ -321,4 +330,3 @@ def get_dense_opt(network_func  = 'dense_v1',
            'is_debugging'   : is_debugging
            }
     return opt
-

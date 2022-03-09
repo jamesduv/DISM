@@ -2,37 +2,45 @@
 # -*- coding: utf-8 -*-
 
 import os
-import numpy as np
 import tensorflow as tf
 
 def swish(x):
     return (x*tf.keras.activations.sigmoid(x))
 tf.keras.utils.get_custom_objects().update({'swish': swish})
 
-class keras_nids_v0(tf.keras.Model):
+class keras_nids_v1(tf.keras.Model):
     '''NIDS model. Subclasses tf.keras.Model. and takes arbitrary tf.keras.Models for
     the spatial (main) and parameter (hypernetwork) networks during construction.
 
     Attributes:
-         self.opt (dict) : all model options
-         self.spatial_net (tf.keras.Model)  : spatial network
-         self.parameter_net (tf.keras.Model): parameter network
-         self.call_backs (list)  : container for training callbacks
-         self.split_sizes (list) : used for splitting w_hat
-         self.wt_mat_shape (tuple) : shape of final layer weight matrix
+         opt (dict) : all model options
+         spatial_net (tf.keras.Model)  : spatial network
+         parameter_net (tf.keras.Model): parameter network
+         call_backs (list)  : container for training callbacks
+         split_sizes (list) : used for splitting w_hat
+         wt_mat_shape (tuple) : shape of final layer weight matrix
          Filenames:
-            self.fn_csv                 
-            self.fn_weights_val_best    
-            self.fn_weights_train_best  
-            self.fn_weights_end         
-            self.fn_model_val_best      
-            self.fn_model_train_best    
-            self.fn_model_end 
+            fn_csv                 
+            fn_weights_val_best    
+            fn_weights_train_best  
+            fn_weights_end         
+            fn_model_val_best      
+            fn_model_train_best    
+            fn_model_end 
 
+    Methods:
+        call()          : wrapper around self.call_model()  
+        call_model()    : forward propagate model, return final result
+        call_model_modes()  : forward propagate model, return final result and output layer items
+        set_save_paths()    : training utility, make filenames
+        start_csv_logger()  : training utility
+        make_callbacks_weights() : training utility, callbacks to save weights
+        make_callbacks_model()   : training utility, callbacks to save model
+        tensorboard_callbacks()  : training utility, profiling callback
     '''
 
     def __init__(self, opt, spatial_net, parameter_net):
-        super(keras_nids_v0, self).__init__()
+        super(keras_nids_v1, self).__init__()
         self.opt            = opt
         self.spatial_net    = spatial_net
         self.parameter_net  = parameter_net
@@ -107,7 +115,13 @@ class keras_nids_v0(tf.keras.Model):
         self.call_backs.append(csv_logger)
           
     def make_callbacks_weights(self):
-        '''Make checkpoints to save the model weights in .h5 format during training'''
+        '''Make checkpoints to save the model weights in .h5 format during training
+        
+        Make checkpoints for:
+            1. best validation loss
+            2. best training loss
+            3. most recent epoch
+        '''
 
         if self.call_backs is None:
             self.call_backs = []
@@ -135,7 +149,14 @@ class keras_nids_v0(tf.keras.Model):
         self.call_backs.append(checkpoint_3)
 
     def make_callbacks_model(self):
-        '''Make callbacks to save the model in .tf format during training'''
+        '''Make callbacks to save the model in .tf format during training
+        
+        Make checkpoints for:
+            1. best validation loss
+            2. best training loss
+            3. most recent epoch
+        '''
+
         if self.call_backs is None:
             self.call_backs = []
         
@@ -165,7 +186,8 @@ class keras_nids_v0(tf.keras.Model):
         self.call_backs.append(checkpoint_3)
 
     def tensorboard_callbacks(self, histogram_freq=10, profile_batch=(1,5)):
-        '''Create tensorboard callbacks
+        '''Make Tensorboard callbacks to profile the model during training
+        
         Args:
             histogram_freq (int) : epoch-frequency to save histograms, use 0 to not save histograms
             profile_batch (int or tuple of int) : batch or batches to profile between
@@ -180,7 +202,7 @@ class keras_nids_v0(tf.keras.Model):
             self.call_backs = []
         self.call_backs.append(tb_callback)
 
-def get_keras_nids_v0_opt(network_func  = 'keras_nids_v0',
+def get_keras_nids_v1_opt(network_func  = 'keras_nids_v1',
                             name        = '',
                             data_opt    = {},
                             noutput    = 3,
