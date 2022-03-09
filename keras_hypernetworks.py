@@ -64,11 +64,11 @@ class keras_hypernet_v1(tf.keras.Model):
     '''Design-variable hypernetwork model. Subclasses tf.keras.Model, and takes 
     an arbitrary tf.keras.Model hypernetwork as an argument during construction.
 
-    Two methods are provided to call the overall model, where the hypernetwork
-    is either evaluated once (efficient), or as many times as there are main 
-    network inputs (inefficient).
-    1. call_model() : inefficient
-    2. 
+    Use self.call or self.call_model to call the overall model without composing the main 
+    network, which evaluates the hypernetwork for every main network input. Used during training.
+
+    Use self.compose_main_network() to generate the weights for a single case (main network), 
+    load them into a tf.keras.Model, and return it.
     
     Attributes:
         self.hypernet (tf.keras.Model)  : tf.keras hypernetwork, generates weights/biases
@@ -241,7 +241,7 @@ class keras_hypernet_v1(tf.keras.Model):
         return model
 
     def set_save_paths(self):
-        '''Set paths for saving quantities during training'''
+        '''Set paths for saving items during training'''
 
         self.fn_csv                 = os.path.join(self.opt['save_dir'], 'training.csv')
 
@@ -323,7 +323,7 @@ class keras_hypernet_v1(tf.keras.Model):
     def tensorboard_callbacks(self, histogram_freq=10, profile_batch=(1,5)):
         '''Create tensorboard callbacks
         Args:
-            histogram_freq (int)                : epoch frequency to save histograms, use 0 to not save histograms
+            histogram_freq (int) : epoch-frequency to save histograms, use 0 to not save histograms
             profile_batch (int or tuple of int) : batch or batches to profile between
         '''
 

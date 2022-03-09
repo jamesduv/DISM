@@ -10,8 +10,26 @@ def swish(x):
 tf.keras.utils.get_custom_objects().update({'swish': swish})
 
 class keras_nids_v0(tf.keras.Model):
-    '''Implementation of NIDS network where each the spatial and parameter networks are 
-    tf.keras models, supplied to the class constructor'''
+    '''NIDS model. Subclasses tf.keras.Model. and takes arbitrary tf.keras.Models for
+    the spatial (main) and parameter (hypernetwork) networks during construction.
+
+    Attributes:
+         self.opt (dict) : all model options
+         self.spatial_net (tf.keras.Model)  : spatial network
+         self.parameter_net (tf.keras.Model): parameter network
+         self.call_backs (list)  : container for training callbacks
+         self.split_sizes (list) : used for splitting w_hat
+         self.wt_mat_shape (tuple) : shape of final layer weight matrix
+         Filenames:
+            self.fn_csv                 
+            self.fn_weights_val_best    
+            self.fn_weights_train_best  
+            self.fn_weights_end         
+            self.fn_model_val_best      
+            self.fn_model_train_best    
+            self.fn_model_end 
+
+    '''
 
     def __init__(self, opt, spatial_net, parameter_net):
         super(keras_nids_v0, self).__init__()
@@ -23,10 +41,21 @@ class keras_nids_v0(tf.keras.Model):
         self.wt_mat_shape   = self.opt['wt_mat_shape']
 
     def call(self,x):
+        '''Over-ride call(self, x) for use with tf.keras.Model.fit()
+        See self.call_model()
+        '''
+
         return(self.call_model(x = x[0], mu = x[1]))
 
     def call_model(self, x, mu, training=False):
-        '''Call the full NIDS model, return only the final result'''
+        '''Call the full NIDS model, return only the final result
+        
+        Args:
+            x (ndarray/tensor)     : spatial network inputs, x \in n_pts x n_spatial
+            mu (ndarray/tensor)    : parameter network inputs, mu \in n_pts x n_param
+
+        Returns:
+            y_pred (ndarray/tensor) : main network output, y_pred \in n_pts x n_state'''
 
         param_net_out   = self.parameter_net(mu, training=training)
         weight, bias    = tf.split(param_net_out, num_or_size_splits=self.split_sizes, axis=1)
@@ -36,7 +65,19 @@ class keras_nids_v0(tf.keras.Model):
         return y_pred
     
     def call_model_modes(self, x, mu, training=False):
-        '''Call the full NIDS model, return final result, hx, and weight/bias'''
+        '''Call the full NIDS model, return final result, hx, and weight/bias
+        
+        Args:
+            x (ndarray/tensor)     : spatial network inputs, x \in n_pts x n_spatial
+            mu (ndarray/tensor)    : parameter network inputs, mu \in n_pts x n_param
+
+        Returns:
+            y_pred (ndarray/tensor) : main network output
+            hx (ndarray/tensor) : final hidden state, hx \in n_pts x n_h
+            weight (ndarray/tensor) : output layer weight matrix, weight \in n_pts x n_state x n_h
+            bias (ndarray/tensor)   : output layer bias vector, bias \in n_pts x n_h
+        '''
+
         param_net_out   = self.parameter_net(mu, training=training)
         weight, bias    = tf.split(param_net_out, num_or_size_splits=self.split_sizes, axis=1)
         weight          = tf.reshape(weight, self.wt_mat_shape)
@@ -44,8 +85,9 @@ class keras_nids_v0(tf.keras.Model):
         y_pred          = tf.einsum('ijk,ik->ij', weight, hx) + bias
         return y_pred, hx, weight, bias
 
-
     def set_save_paths(self):
+        '''Set paths for saving items during training'''
+
         self.fn_csv             = os.path.join(self.opt['save_dir'], 'training.csv')
 
         self.fn_weights_val_best    = os.path.join(self.opt['save_dir'], 'weights.val_best.h5')
@@ -57,14 +99,16 @@ class keras_nids_v0(tf.keras.Model):
         self.fn_model_end           = os.path.join(self.opt['save_dir'], 'model.end.tf')
 
     def start_csv_logger(self):
-        '''Start the csv_logger, OVERWRITES self.call_backs'''
+        '''Start the csv_logger for training'''
+
         csv_logger = tf.keras.callbacks.CSVLogger(self.fn_csv)
         if self.call_backs is None:
             self.call_backs = []
         self.call_backs.append(csv_logger)
           
     def make_callbacks_weights(self):
-        '''Make checkpoints to save the weights only during training'''
+        '''Make checkpoints to save the model weights in .h5 format during training'''
+
         if self.call_backs is None:
             self.call_backs = []
 
@@ -91,7 +135,7 @@ class keras_nids_v0(tf.keras.Model):
         self.call_backs.append(checkpoint_3)
 
     def make_callbacks_model(self):
-        '''Make callbacks to save the model to file'''
+        '''Make callbacks to save the model in .tf format during training'''
         if self.call_backs is None:
             self.call_backs = []
         
@@ -121,6 +165,11 @@ class keras_nids_v0(tf.keras.Model):
         self.call_backs.append(checkpoint_3)
 
     def tensorboard_callbacks(self, histogram_freq=10, profile_batch=(1,5)):
+        '''Create tensorboard callbacks
+        Args:
+            histogram_freq (int) : epoch-frequency to save histograms, use 0 to not save histograms
+            profile_batch (int or tuple of int) : batch or batches to profile between
+        '''
 
         self.log_dir = os.path.join(self.opt['save_dir'], 'tb_logs', 'training')
         tb_callback  = tf.keras.callbacks.TensorBoard(log_dir = self.log_dir,
@@ -169,8 +218,6 @@ def get_keras_nids_v0_opt(network_func  = 'keras_nids_v0',
     else:
         optimizer_kwargs = {}
 
-    
-
     opt = { 'network_func'  : network_func,
             'name'          : name,
             'data_opt'      : data_opt,
@@ -206,6 +253,3 @@ def get_keras_nids_v0_opt(network_func  = 'keras_nids_v0',
             'save_dir_base' : save_dir_base,
             'is_debugging'  : is_debugging}
     return opt
-
-    
-
