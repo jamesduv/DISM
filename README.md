@@ -1,7 +1,6 @@
 # DISM
 
 Discretization Independent Surrogate Modeling
-Test test test
 
 Introduction
 ------------
